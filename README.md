@@ -1,70 +1,72 @@
-# LabShift – Lab Assistant Scheduling App
+# LabShift — Lab Assistant Scheduling App
 
-LabShift helps research labs automatically create a weekly schedule for undergraduate lab assistants, based on when each student is available. The goal: ensure every session has enough coverage while respecting each student’s class/work schedule.
+LabShift is a mobile app designed to help research labs automatically schedule undergraduate lab assistants based on their weekly availability. The app ensures that each lab session is properly staffed while respecting each assistant’s class and work schedules.
 
-> Built with React Native (Expo) + Node/Express + MySQL + AsyncStorage
+Built with **React Native (Expo)** on the frontend and a **Node/Express + MySQL** backend.
 
 ---
 
-## App Screens & Flows
+## App Features
 
-| Screen | Purpose |
-|--------|---------|
-| Dashboard | Shows lab summary + generate schedule button |
-| Assistants List | View and remove assistants (long-press to delete) |
-| New Assistant Form | Add availability (morning/afternoon, Mon–Fri) |
-| Schedule | Displays generated balanced weekly schedule |
+- Add lab assistants and set weekly availability (Mon–Fri, AM/PM)
+- View all assistants in a list
+- Remove an assistant by long-pressing their name
+- Generate a **balanced weekly schedule** with:
+  - 2 sessions per day (morning & afternoon)
+  - 2 assistants per session (configurable)
+  - Assistants limited to 2 sessions per week (configurable)
+- Dashboard overview showing number of assistants and scheduled sessions
+- Lab name + PI name stored persistently using **AsyncStorage**
 
 ---
 
 ## How It Works
 
-- Each assistant must attend **2 sessions per week**  
-- Each day has **morning & afternoon sessions**
-- **2 assistants per session** (configurable)
-- Generates an optimized schedule automatically based on availability
+- App collects availability selections from each assistant
+- Backend stores data in MySQL
+- Schedule generation uses constraints (people per session + max sessions/week)
+- Final schedule is grouped by weekday using consistent formatted time labels
+
+ Result: A complete weekly schedule in just one tap!
 
 ---
 
-## Tech Stack
+## Project Structure
 
-**Mobile App**
-- React Native + Expo (TypeScript)
-- React Navigation (stack + tabs)
-- Context API for state management
-- Axios for API communication
-- AsyncStorage for local config (Lab & PI name)
-
-**Backend**
-- Node.js + Express
-- MySQL (via mysql2)
-- REST API: Assistants, Availability, Constraints, Schedule
-
----
-
-## Repo Structure
+```
 labshift/
-app/ → Expo project (React Native frontend)
-backend/ → Node.js API with MySQL
+  app/        → React Native + Expo mobile application
+  backend/    → Node.js + Express REST API with MySQL
+```
 
 ---
 
-## Running the Backend
+## Backend Setup
+
+### 1. Install dependencies
 
 ```bash
 cd backend
 npm install
+```
 
-Create .env in /backend:
+### 2. Configure environment
 
+Create a file named **`.env`** inside `backend/`:
+
+```env
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=YOUR_PASSWORD
 DB_NAME=labshift
 PORT=4000
+```
 
-Start MySQL and run this schema if new database:
+### 3. MySQL Setup
 
+Open MySQL Workbench (or CLI) and create the required tables:
+
+```sql
 USE labshift;
 
 CREATE TABLE assistants (
@@ -88,53 +90,73 @@ CREATE TABLE constraints (
   sessions_per_assistant INT NOT NULL
 );
 
-INSERT INTO constraints VALUES (1, 2, 2);
+INSERT INTO constraints (id, people_per_session, sessions_per_assistant)
+VALUES (1, 2, 2);
+```
 
-Then run:
+Start backend:
+
+```bash
 npm run dev
+```
 
-You should see:
+Expected:
+
+```
 API running on port 4000
 Connected to MySQL: labshift
+```
 
-Running the App
+---
 
+## App Setup (Frontend)
+
+### 1. Install dependencies
+
+```bash
 cd app
 npm install
-npx expo start
+```
 
-Important: Update your IP in src/lib/api.ts
+### 2. Set correct API URL
 
+Edit `app/src/lib/api.ts`:
+
+```ts
 const API_BASE_URL = 'http://YOUR_LOCAL_IP:4000';
+```
 
-Make sure:
+> Tip (Mac): run `ipconfig getifaddr en0` in Terminal to find your local IP.
 
-Phone and laptop are on the same Wi-Fi
+ Phone + laptop must be on **same Wi-Fi network** for Expo Go to reach backend.
 
-Backend is running
+### 3. Start Expo
 
-Open with Expo Go on iOS/Android
+```bash
+npx expo start
+```
 
-Demo Instructions
+Scan QR code using Expo Go.
 
-Add a few assistants
+---
 
-Set availability for each
+## Future Improvements
 
-Return to Dashboard → Press Generate Schedule
+- Editable times (not just AM/PM)
+- Full constraints control in UI
+- Better session balancing algorithm
+- Multi-lab support (authentication)
+- Import availability from Google Calendar / .ics files
 
-Check Schedule tab to view balanced assignments
+---
 
-Long-press on any assistant to remove them
+## Author
 
-Accessibility
+**Erika Germinario**  
+Creighton University
 
-Screen reader labels added for interactive elements
+---
 
-High-contrast dark theme
+## License
 
-Clear button labels and large touch targets
-
-Author
-
-Erika Germinario — Creighton University
+MIT License
