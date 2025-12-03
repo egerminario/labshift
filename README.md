@@ -154,9 +154,3 @@ Scan QR code using Expo Go.
 
 **Erika Germinario**  
 Creighton University
-
----
-
-## License
-
-MIT License
