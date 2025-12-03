@@ -31,8 +31,6 @@ async function query(sql, params) {
   return rows;
 }
 
-// --- ROUTES ---
-
 // Health check
 app.get('/health', async (req, res) => {
   try {
@@ -187,6 +185,7 @@ app.post('/generate-schedule', async (req, res) => {
   }
 });
 
+// Remove assistants
 app.delete('/assistants/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -195,7 +194,6 @@ app.delete('/assistants/:id', async (req, res) => {
     }
 
     await query('DELETE FROM assistants WHERE id = ?', [id]);
-    // availability rows will be removed automatically if you have ON DELETE CASCADE
     return res.status(204).end();
   } catch (e) {
     console.error('Error deleting assistant', e);

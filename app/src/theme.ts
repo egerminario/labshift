@@ -1,4 +1,3 @@
-// src/theme.ts
 export const colors = {
   background: '#0f172a',     // dark slate
   surface: '#111827',        // card bg
