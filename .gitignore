@@ -1,0 +1,19 @@
+# Node / React Native / Expo
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.expo/
+.expo-shared/
+dist/
+build/
+
+# iOS / Android build stuff
+ios/
+android/
+
+# MacOS
+.DS_Store
+
+# Env files
+.env
+*.env
