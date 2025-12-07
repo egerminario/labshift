@@ -12,26 +12,43 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useSchedule } from '../context/ScheduleContext';
 import type { DayOfWeek, TimeSlot, Availability } from '../lib/api';
-import { colors } from '../theme';
 
-
+// Weekdays and time slots that define the availability grid.
 const days: DayOfWeek[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const slots: TimeSlot[] = ['morning', 'afternoon'];
 
+/**
+ * AssistantFormScreen
+ * 
+ * Screen for creating a new lab assistant:
+ * - Captures basic metadata (name, email).
+ * - Lets users toggle weekly availability by day/slot.
+ * - Calls `saveAssistant` from ScheduleContext to persist.
+ * 
+ * After a successful save, it navigates back to the previous screen.
+ */
 export default function AssistantFormScreen() {
   const navigation = useNavigation();
   const { saveAssistant } = useSchedule();
 
+  // Text fields for assistant identity.
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  // Tracks whether a save request is in-flight (disables button + updates label).
   const [saving, setSaving] = useState(false);
 
+  // Initialize availability with all days defined and empty slot arrays.
   const [availability, setAvailability] = useState<Availability>(() => {
     const base: any = {};
     days.forEach((d) => (base[d] = []));
     return base;
   });
 
+  /**
+   * Toggles a single day/slot combination on or off.
+   * - If the slot already exists for that day, remove it.
+   * - Otherwise, add it to that day's array.
+   */
   const toggleSlot = (day: DayOfWeek, slot: TimeSlot) => {
     setAvailability((prev) => {
       const daySlots = prev[day] || [];
@@ -43,6 +60,13 @@ export default function AssistantFormScreen() {
     });
   };
 
+  /**
+   * Validate input and attempt to save the assistant via the context.
+   * Handles:
+   * - Missing name
+   * - Duplicate email error (HTTP 409 from backend)
+   * - Generic network/backend errors
+   */
   const onSave = async () => {
     if (!name.trim()) {
       Alert.alert('Missing name', 'Please enter the assistant’s name.');
@@ -63,7 +87,7 @@ export default function AssistantFormScreen() {
       console.log('Assistant saved, going back');
       navigation.goBack();
     } catch (e: any) {
-
+      // Axios-style error handling: inspect HTTP status + backend error payload.
       const status = e?.response?.status;
       const message = e?.response?.data?.error;
 

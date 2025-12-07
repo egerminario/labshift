@@ -12,13 +12,26 @@ import { useNavigation } from '@react-navigation/native';
 import { useSchedule } from '../context/ScheduleContext';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { colors } from '../theme';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'MainTabs'>;
 
+/**
+ * AssistantsScreen
+ * 
+ * Lists all lab assistants and provides:
+ * - A button to navigate to the AssistantFormScreen to add a new assistant.
+ * - A long-press gesture on each card to remove an assistant (with confirmation).
+ * 
+ * Data is sourced from ScheduleContext, which keeps this screen purely presentational.
+ */
 export default function AssistantsScreen() {
   const { assistants, removeAssistant } = useSchedule();
   const navigation = useNavigation<NavProp>();
+
+  /**
+   * Show a confirmation dialog before removing an assistant.
+   * Does nothing if `id` is missing (shouldn't happen for valid items).
+   */
   const confirmDelete = (id?: number, name?: string) => {
   if (!id) return;
   Alert.alert(
@@ -105,6 +118,6 @@ const styles = StyleSheet.create({
   deleteHint: {
   marginTop: 4,
   fontSize: 11,
-  color: colors.textMuted,
+  color: '#6b7280',
   },
 });

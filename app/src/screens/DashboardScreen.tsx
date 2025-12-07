@@ -9,6 +9,17 @@ import {
 import { useSchedule } from '../context/ScheduleContext';
 import { useSettings } from '../context/SettingsContext';
 
+/**
+ * DashboardScreen
+ * 
+ * High-level summary screen that gives the user insight into:
+ * - Lab identity (from SettingsContext)
+ * - Count of assistants currently configured
+ * - Count of generated schedule sessions
+ * 
+ * It also provides the primary CTA: "Generate Schedule," which calls
+ * backend scheduling logic and updates context state.
+ */
 export default function DashboardScreen() {
   const { assistants, sessions, loading, error, runGenerate } = useSchedule();
   const { settings } = useSettings();

@@ -3,6 +3,7 @@ import { View, Text, Button, FlatList, StyleSheet } from 'react-native';
 import { useSchedule } from '../context/ScheduleContext';
 import { getSlotMeta } from '../lib/slotMeta';
 
+// Mapping from short weekday codes to full names for display.
 const fullDayNames: Record<string, string> = {
   Mon: 'Monday',
   Tue: 'Tuesday',
@@ -11,14 +12,35 @@ const fullDayNames: Record<string, string> = {
   Fri: 'Friday',
 };
 
+/**
+ * ScheduleScreen
+ * 
+ * Renders the generated weekly schedule:
+ * - Shows a "Generate Schedule" button (same action as on Dashboard).
+ * - Groups sessions by day and lists time slots for each.
+ * - Uses slot metadata (time range + label) for more descriptive cards.
+ */
 export default function ScheduleScreen() {
   const { sessions, assistants, runGenerate, loading } = useSchedule();
 
+  /**
+   * Resolve assistant IDs into a readable string of names.
+   * Falls back to "Unassigned" if an ID is missing from the list.
+   */
   const getNames = (ids: number[]) =>
     ids
       .map((id) => assistants.find((a) => a.id === id)?.name || 'Unassigned')
       .join(' & ');
 
+  /**
+   * Group sessions by day so we can render them in sections.
+   * Result shape:
+   * {
+   *  Mon: [session, session],
+   *  Tue: [session],
+   *  ...
+   * }
+   */
   const grouped = sessions.reduce((acc: any, s) => {
     acc[s.day] = acc[s.day] || [];
     acc[s.day].push(s);

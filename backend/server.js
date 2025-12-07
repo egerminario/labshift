@@ -9,7 +9,10 @@ app.use(express.json());
 
 let pool;
 
-// Initialize connection pool
+/**
+ * Initialize a MySQL connection pool using environment variables.
+ * This runs once on startup; if it fails, the process exits.
+ */
 async function initDb() {
   pool = await mysql.createPool({
     host: process.env.DB_HOST,
@@ -25,13 +28,20 @@ initDb().catch((err) => {
   process.exit(1);
 });
 
-// simple helper
+/**
+ * Simple query helper that:
+ * - Executes a prepared statement with parameters.
+ * - Returns only the rows (no metadata)
+ */
 async function query(sql, params) {
   const [rows] = await pool.execute(sql, params);
   return rows;
 }
 
-// Health check
+/**
+ * Health check endpoint
+ * - Verifies DB connectivity with a cheap SELECT 1
+ */
 app.get('/health', async (req, res) => {
   try {
     const rows = await query('SELECT 1 AS ok', []);
@@ -42,7 +52,21 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Get all assistants (with availability)
+/**
+ * Get all assistants (including availability)
+ * 
+ * Response shape matches the frontend AssistantDto:
+ * [
+ *  {
+ *    id,
+ *    name,
+ *    email,
+ *    maxSessionsPerWeek,
+ *    availability: { Mon: [], Tue: [], ...}
+ *  },
+ *  ...
+ * ]
+ */
 app.get('/assistants', async (req, res) => {
   try {
     const assistants = await query('SELECT * FROM assistants', []);
@@ -76,17 +100,25 @@ app.get('/assistants', async (req, res) => {
   }
 });
 
-// Create assistant
+/**
+ * Create assistant
+ * 
+ * Inserts a new assistant and its availability rows.
+ * On duplicate email (unique index), returns HTTP 409 with a clear message
+ * so the frontend can surface this to the user.
+ */
 app.post('/assistants', async (req, res) => {
   try {
     const { name, email, maxSessionsPerWeek, availability } = req.body;
 
+    // Insert base assistant row
     const result = await query(
       'INSERT INTO assistants (name, email, max_sessions_per_week) VALUES (?, ?, ?)',
       [name, email || null, maxSessionsPerWeek ?? 2]
     );
     const assistantId = result.insertId;
 
+    // Prepare availability rows
     const avRows = [];
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     for (const day of days) {
@@ -96,6 +128,7 @@ app.post('/assistants', async (req, res) => {
       }
     }
 
+    // Bulk-insert availability if any slots were provided
     if (avRows.length) {
       await pool.query(
         'INSERT INTO availability (assistant_id, day_of_week, slot) VALUES ?',
@@ -105,12 +138,23 @@ app.post('/assistants', async (req, res) => {
 
     res.status(201).json({ id: assistantId });
   } catch (e) {
-    console.error(e);
+    console.error('Error creating assistant', e);
+
+    // Handle duplicate email (unique index violation) with 409 for the frontend
+    if (e.code === 'ER_DUP_ENTRY') {
+      return res
+        .status(409)
+        .json({ error: 'An assistant with this email already exists.' });
+    }
+
     res.status(500).json({ error: 'Failed to create assistant' });
   }
 });
 
-// Get constraints
+/**
+ * Get global constraints for scheduling.
+ * For now, we assume a single row with id = 1.
+ */
 app.get('/constraints', async (req, res) => {
   try {
     const rows = await query('SELECT * FROM constraints WHERE id = 1', []);
@@ -126,7 +170,10 @@ app.get('/constraints', async (req, res) => {
   }
 });
 
-// Update constraints
+/**
+ * Update gloabl constraints.
+ * This directly updates the single constraints row (id = 1).
+ */
 app.put('/constraints', async (req, res) => {
   try {
     const { sessionsPerDay, peoplePerSession, sessionsPerAssistant } = req.body;
@@ -137,18 +184,17 @@ app.put('/constraints', async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error('Error creating assistant', e);
-
-    if (e.code === 'ER_DUP_ENTRY') {
-        return res
-            .status(409)
-            ,json({ error: 'An assistant with this email already exists.' });
-    }
-
     res.status(500).json({ error: 'Failed to update constraints' });
   }
 });
 
-// Generate schedule
+/**
+ * Generate schedule
+ * 
+ * - Loads assistants, their availability, and global constraints.
+ * - Normalizes data into AssistantDto-like objects.
+ * - Calls a greedy scheduler to assign assistants to daily slots.
+ */
 app.post('/generate-schedule', async (req, res) => {
   try {
     const assistants = await query('SELECT * FROM assistants', []);
@@ -185,15 +231,21 @@ app.post('/generate-schedule', async (req, res) => {
   }
 });
 
-// Remove assistants
+/**
+ * Remove assistant
+ * 
+ * Deletes an assistant by id.
+ */
 app.delete('/assistants/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) {
       return res.status(400).json({ error: 'Invalid assistant id' });
     }
-
+    
+    // If needed
     await query('DELETE FROM assistants WHERE id = ?', [id]);
+
     return res.status(204).end();
   } catch (e) {
     console.error('Error deleting assistant', e);
@@ -202,7 +254,18 @@ app.delete('/assistants/:id', async (req, res) => {
 });
 
 
-// Greedy scheduler
+/**
+ * Greedy scheduler
+ * 
+ * - Iterates over each day + slot combination.
+ * - Finds assistants available in that slot.
+ * - Sorts them by how many sessions they already have (ascending).
+ * - Assigns assistants up to peoplePerSession, respecting max per assistant
+ *  (either their own maxSessionsPerWeek or the global sessionsPerAssistant).
+ * 
+ * Returns an array of:
+ *  { id: `${day}-${slot}`, day, slot, assistants: [assistantId, ...] }
+ */
 function generateSchedule(assistants, constraints) {
   const { days, peoplePerSession, sessionsPerAssistant } = constraints;
   const sessions = [];
@@ -212,10 +275,12 @@ function generateSchedule(assistants, constraints) {
 
   for (const day of days) {
     for (const slot of slots) {
+      // Assistants who are available for this day/slot
       const available = assistants.filter((a) =>
         a.availability[day]?.includes(slot)
       );
 
+      // Prefer assistants with fewer assigned sessions so far
       available.sort(
         (a, b) =>
           (assignedCount.get(a.id) ?? 0) - (assignedCount.get(b.id) ?? 0)
